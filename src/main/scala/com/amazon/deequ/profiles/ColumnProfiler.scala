@@ -34,7 +34,9 @@ private[deequ] case class GenericColumnStatistics(
     typeDetectionHistograms: Map[String, Map[String, Long]],
     approximateNumDistincts: Map[String, Long],
     completenesses: Map[String, Double],
-    predefinedTypes: Map[String, DataTypeInstances.Value]) {
+    predefinedTypes: Map[String, DataTypeInstances.Value],
+    minLengths: Map[String, Double],
+    maxLengths: Map[String, Double]) {
 
   def typeOf(column: String): DataTypeInstances.Value = {
     val inferredAndKnown = inferredTypes ++ knownTypes ++ predefinedTypes
@@ -101,7 +103,9 @@ object ColumnProfiler {
       saveInMetricsRepositoryUsingKey: Option[ResultKey] = None,
       kllProfiling: Boolean = false,
       kllParameters: Option[KLLParameters] = None,
-      predefinedTypes: Map[String, DataTypeInstances.Value] = Map.empty)
+      predefinedTypes: Map[String, DataTypeInstances.Value] = Map.empty,
+      createExtendedStringProfile: Boolean = false,
+      useDefaultLengthForNullValues: Boolean = false)
     : ColumnProfiles = {
 
     // Ensure that all desired columns exist
@@ -124,7 +128,9 @@ object ColumnProfiler {
     val analyzersForGenericStats = getAnalyzersForGenericStats(
       data.schema,
       relevantColumns,
-      predefinedTypes)
+      predefinedTypes,
+      createExtendedStringProfile,
+      useDefaultLengthForNullValues)
 
     var analysisRunnerFirstPass = AnalysisRunner
       .onData(data)
@@ -206,7 +212,10 @@ object ColumnProfiler {
 
     val thirdPassResults = CategoricalColumnStatistics(histograms)
 
-    createProfiles(relevantColumns, genericStatistics, numericStatistics, thirdPassResults)
+    createProfiles(
+      relevantColumns, genericStatistics,
+      numericStatistics, thirdPassResults, createExtendedStringProfile
+    )
   }
 
   private[this] def getRelevantColumns(
@@ -222,7 +231,9 @@ object ColumnProfiler {
   private[this] def getAnalyzersForGenericStats(
       schema: StructType,
       relevantColumns: Seq[String],
-      predefinedTypes: Map[String, DataTypeInstances.Value])
+      predefinedTypes: Map[String, DataTypeInstances.Value],
+      createExtendedStringProfile: Boolean = false,
+      useDefaultLengthForNullValues: Boolean = false)
     : Seq[Analyzer[_, Metric[_]]] = {
 
     schema.fields
@@ -232,7 +243,14 @@ object ColumnProfiler {
         val name = field.name
 
         if (field.dataType == StringType && !predefinedTypes.contains(name)) {
-          Seq(Completeness(name), ApproxCountDistinct(name), DataType(name))
+          val lengthAnalyzers = if (createExtendedStringProfile) {
+            val defaultLengthValue = if (useDefaultLengthForNullValues) Some(0.0) else None
+            Seq(
+              MinLength(name, None, defaultLengthValue),
+              MaxLength(name, None, defaultLengthValue)
+            )
+          } else Seq.empty
+          Seq(Completeness(name), ApproxCountDistinct(name), DataType(name)) ++ lengthAnalyzers
         } else {
           Seq(Completeness(name), ApproxCountDistinct(name))
         }
@@ -415,6 +433,16 @@ object ColumnProfiler {
         analyzer.column -> metric.value.get
       }
 
+    val minLengths = results.metricMap
+      .collect { case (analyzer: MinLength, metric: DoubleMetric) =>
+        analyzer.column -> metric.value.get
+      }
+
+    val maxLengths = results.metricMap
+      .collect { case (analyzer: MaxLength, metric: DoubleMetric) =>
+        analyzer.column -> metric.value.get
+      }
+
     val knownTypes = schema.fields
       .filter { column => columns.contains(column.name) }
       .filterNot { column => predefinedTypes.contains(column.name)}
@@ -437,7 +465,7 @@ object ColumnProfiler {
       .toMap
 
     GenericColumnStatistics(numRecords, inferredTypes, knownTypes, typeDetectionHistograms,
-      approximateNumDistincts, completenesses, predefinedTypes)
+      approximateNumDistincts, completenesses, predefinedTypes, minLengths, maxLengths)
   }
 
 
@@ -676,7 +704,8 @@ object ColumnProfiler {
       columns: Seq[String],
       genericStats: GenericColumnStatistics,
       numericStats: NumericColumnStatistics,
-      categoricalStats: CategoricalColumnStatistics)
+      categoricalStats: CategoricalColumnStatistics,
+      createExtendedStringProfile: Boolean = false)
     : ColumnProfiles = {
 
     val profiles = columns
@@ -708,6 +737,18 @@ object ColumnProfiler {
               numericStats.sums.get(name),
               numericStats.stdDevs.get(name),
               numericStats.approxPercentiles.get(name))
+
+          case String if createExtendedStringProfile =>
+            ExtendedStringColumnProfile(
+              name,
+              completeness,
+              approxNumDistinct,
+              dataType,
+              isDataTypeInferred,
+              typeCounts,
+              histogram,
+              genericStats.minLengths.get(name).map(_.floor.toInt),
+              genericStats.maxLengths.get(name).map(_.ceil.toInt))
 
           case _ =>
             StandardColumnProfile(

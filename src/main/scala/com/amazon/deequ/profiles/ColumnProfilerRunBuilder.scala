@@ -42,6 +42,8 @@ class ColumnProfilerRunBuilder(val data: DataFrame) {
   protected var kllProfiling = false
   protected var kllParameters: Option[KLLParameters] = None
   protected var predefinedTypes: Map[String, DataTypeInstances.Value] = Map.empty
+  protected var createExtendedStringProfile: Boolean = false
+  protected var useDefaultLengthForNullValues: Boolean = false
 
   protected def this(constraintSuggestionRunBuilder: ColumnProfilerRunBuilder) {
 
@@ -138,6 +140,25 @@ class ColumnProfilerRunBuilder(val data: DataFrame) {
     this
   }
 
+  /**
+   * Enable extended profile generation for string columns
+   *
+   * @param createExtendedStringProfile Whether to create an extended profile for string columns
+   */
+  def createExtendedStringProfile(createExtendedStringProfile: Boolean): this.type = {
+    this.createExtendedStringProfile = createExtendedStringProfile
+    this
+  }
+
+  /**
+   * Enable use of default value of 0.0 for length when the row value is null
+   *
+   * @param useDefaultLengthForNullValues Whether to create an extended profile for string columns
+   */
+  def useDefaultLengthForNullValues(useDefaultLengthForNullValues: Boolean): this.type = {
+    this.useDefaultLengthForNullValues = useDefaultLengthForNullValues
+    this
+  }
 
   /**
     * Set a metrics repository associated with the current data to enable features like reusing
@@ -182,7 +203,9 @@ class ColumnProfilerRunBuilder(val data: DataFrame) {
         saveOrAppendResultsKey),
       kllProfiling,
       kllParameters,
-      predefinedTypes
+      predefinedTypes,
+      createExtendedStringProfile,
+      useDefaultLengthForNullValues
     )
   }
 }

@@ -40,6 +40,7 @@ class ColumnProfilerRunner {
     new ColumnProfilerRunBuilder(data)
   }
 
+  // scalastyle:off argcount
   private[profiles] def run(
       data: DataFrame,
       restrictToColumns: Option[Seq[String]],
@@ -50,8 +51,11 @@ class ColumnProfilerRunner {
       metricsRepositoryOptions: ColumnProfilerRunBuilderMetricsRepositoryOptions,
       kllProfiling: Boolean,
       kllParameters: Option[KLLParameters],
-      predefinedTypes: Map[String, DataTypeInstances.Value])
+      predefinedTypes: Map[String, DataTypeInstances.Value],
+      createExtendedStringProfile: Boolean = false,
+      useDefaultLengthForNullValues: Boolean = false)
     : ColumnProfiles = {
+    // scalastyle:on
 
     if (cacheInputs) {
       data.cache()
@@ -69,7 +73,9 @@ class ColumnProfilerRunner {
         metricsRepositoryOptions.saveOrAppendResultsKey,
         kllProfiling,
         kllParameters,
-        predefinedTypes
+        predefinedTypes,
+        createExtendedStringProfile,
+        useDefaultLengthForNullValues
       )
 
     saveColumnProfilesJsonToFileSystemIfNecessary(

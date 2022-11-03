@@ -41,10 +41,14 @@ object Rules {
       NonNegativeNumbersRule()
     )
 
+  val STRING: Seq[ConstraintRule[ColumnProfile]] = Seq(HasMinLength(), HasMaxLength())
+
   val NUMERICAL: Seq[ConstraintRule[ColumnProfile]] =
     Seq(HasMax(), HasMin(), HasMean(), HasStandardDeviation())
 
-  val EXTENDED: Seq[ConstraintRule[ColumnProfile]] = DEFAULT ++ NUMERICAL
+  val COMMON: Seq[ConstraintRule[ColumnProfile]] = Seq(UniqueIfApproximatelyUniqueRule())
+
+  val EXTENDED: Seq[ConstraintRule[ColumnProfile]] = DEFAULT ++ STRING ++ NUMERICAL ++ COMMON
 }
 
 private[suggestions] case class ConstraintSuggestionMetricsRepositoryOptions(
@@ -72,6 +76,7 @@ class ConstraintSuggestionRunner {
     new ConstraintSuggestionRunBuilder(data)
   }
 
+  // scalastyle:off argcount
   private[suggestions] def run(
       data: DataFrame,
       constraintRules: Seq[ConstraintRule[ColumnProfile]],
@@ -82,8 +87,11 @@ class ConstraintSuggestionRunner {
       cacheInputs: Boolean,
       fileOutputOptions: ConstraintSuggestionFileOutputOptions,
       metricsRepositoryOptions: ConstraintSuggestionMetricsRepositoryOptions,
-      kllWrapper: (Option[KLLParameters], Map[String, DataTypeInstances.Value])
+      kllWrapper: (Option[KLLParameters], Map[String, DataTypeInstances.Value]),
+      createExtendedStringProfile: Boolean = false,
+      useDefaultLengthForNullValues: Boolean = false
   ): ConstraintSuggestionResult = {
+    // scalastyle:on
 
     // get testset related data from wrapper
     val testsetRatio: Option[Double] = testsetWrapper._1
@@ -116,7 +124,9 @@ class ConstraintSuggestionRunner {
         printStatusUpdates,
         metricsRepositoryOptions,
         kllParameters,
-        predefinedTypes
+        predefinedTypes,
+        createExtendedStringProfile,
+        useDefaultLengthForNullValues
       )
 
     saveColumnProfilesJsonToFileSystemIfNecessary(
@@ -191,13 +201,17 @@ class ConstraintSuggestionRunner {
       printStatusUpdates: Boolean,
       metricsRepositoryOptions: ConstraintSuggestionMetricsRepositoryOptions,
       kllParameters: Option[KLLParameters],
-      predefinedTypes: Map[String, DataTypeInstances.Value]
+      predefinedTypes: Map[String, DataTypeInstances.Value],
+      createExtendedStringProfile: Boolean = false,
+      useDefaultLengthForNullValues: Boolean = false
   ): (ColumnProfiles, Seq[ConstraintSuggestion]) = {
 
     var columnProfilerRunner = ColumnProfilerRunner()
       .onData(trainingData)
       .printStatusUpdates(printStatusUpdates)
       .withLowCardinalityHistogramThreshold(lowCardinalityHistogramThreshold)
+      .createExtendedStringProfile(createExtendedStringProfile)
+      .useDefaultLengthForNullValues(useDefaultLengthForNullValues)
 
     restrictToColumns.foreach { restrictToColumns =>
       columnProfilerRunner =

@@ -18,11 +18,16 @@ package com.amazon.deequ.analyzers
 
 import com.amazon.deequ.analyzers.Analyzers._
 import com.amazon.deequ.analyzers.Preconditions.{hasColumn, isString}
+import com.amazon.deequ.metrics.{DoubleMetric, Entity}
 import org.apache.spark.sql.functions.{length, max}
 import org.apache.spark.sql.types.{DoubleType, StructType}
 import org.apache.spark.sql.{Column, Row}
 
-case class MaxLength(column: String, where: Option[String] = None)
+import scala.util.{Failure, Success}
+
+case class MaxLength(column: String,
+                     where: Option[String] = None,
+                     defaultMetricForNullValues: Option[Double] = None)
   extends StandardScanShareableAnalyzer[MaxState]("MaxLength", column)
   with FilterableAnalyzer {
 
@@ -33,6 +38,18 @@ case class MaxLength(column: String, where: Option[String] = None)
   override def fromAggregationResult(result: Row, offset: Int): Option[MaxState] = {
     ifNoNullsIn(result, offset) { _ =>
       MaxState(result.getDouble(offset))
+    }
+  }
+
+  override def computeMetricFrom(state: Option[MaxState]): DoubleMetric = {
+    state match {
+      case Some(theState) =>
+        DoubleMetric(Entity.Column, "MaxLength", column, Success(theState.maxValue))
+      case _ if defaultMetricForNullValues.isDefined =>
+        DoubleMetric(Entity.Column, "MaxLength", column, Success(defaultMetricForNullValues.get))
+      case _ =>
+        val exception = Analyzers.emptyStateException(this)
+        DoubleMetric(Entity.Column, "MaxLength", column, Failure(exception))
     }
   }
 

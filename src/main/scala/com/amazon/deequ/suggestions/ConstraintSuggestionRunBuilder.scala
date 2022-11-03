@@ -46,6 +46,8 @@ class ConstraintSuggestionRunBuilder(val data: DataFrame) {
   protected var saveEvaluationResultsJsonPath: Option[String] = None
   protected var kllParameters: Option[KLLParameters] = None
   protected var predefinedTypes: Map[String, DataTypeInstances.Value] = Map.empty
+  protected var createExtendedStringProfile: Boolean = false
+  protected var useDefaultLengthForNullValues: Boolean = false
 
   protected def this(constraintSuggestionRunBuilder: ConstraintSuggestionRunBuilder) {
 
@@ -174,6 +176,26 @@ class ConstraintSuggestionRunBuilder(val data: DataFrame) {
   }
 
   /**
+   * Enable extended profile generation for string columns
+   *
+   * @param createExtendedStringProfile Whether to create an extended profile for string columns
+   */
+  def createExtendedStringProfile(createExtendedStringProfile: Boolean): this.type = {
+    this.createExtendedStringProfile = createExtendedStringProfile
+    this
+  }
+
+  /**
+   * Enable use of default value of 0.0 for length when the row value is null
+   *
+   * @param useDefaultLengthForNullValues Whether to create an extended profile for string columns
+   */
+  def useDefaultLengthForNullValues(useDefaultLengthForNullValues: Boolean): this.type = {
+    this.useDefaultLengthForNullValues = useDefaultLengthForNullValues
+    this
+  }
+
+  /**
     * Set a metrics repository associated with the current data to enable features like reusing
     * previously computed results and storing the results of the current run.
     *
@@ -223,7 +245,9 @@ class ConstraintSuggestionRunBuilder(val data: DataFrame) {
         saveOrAppendResultsKey),
         kllWrapper(
           kllParameters,
-          predefinedTypes)
+          predefinedTypes),
+        createExtendedStringProfile,
+        useDefaultLengthForNullValues
     )
   }
 

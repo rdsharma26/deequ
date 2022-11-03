@@ -18,11 +18,16 @@ package com.amazon.deequ.analyzers
 
 import com.amazon.deequ.analyzers.Analyzers._
 import com.amazon.deequ.analyzers.Preconditions.{hasColumn, isString}
+import com.amazon.deequ.metrics.{DoubleMetric, Entity}
 import org.apache.spark.sql.functions.{length, min}
 import org.apache.spark.sql.types.{DoubleType, StructType}
 import org.apache.spark.sql.{Column, Row}
 
-case class MinLength(column: String, where: Option[String] = None)
+import scala.util.{Failure, Success}
+
+case class MinLength(column: String,
+                     where: Option[String] = None,
+                     defaultMetricForNullValues: Option[Double] = None)
   extends StandardScanShareableAnalyzer[MinState]("MinLength", column)
   with FilterableAnalyzer {
 
@@ -33,6 +38,18 @@ case class MinLength(column: String, where: Option[String] = None)
   override def fromAggregationResult(result: Row, offset: Int): Option[MinState] = {
     ifNoNullsIn(result, offset) { _ =>
       MinState(result.getDouble(offset))
+    }
+  }
+
+  override def computeMetricFrom(state: Option[MinState]): DoubleMetric = {
+    state match {
+      case Some(theState) =>
+        DoubleMetric(Entity.Column, "MinLength", column, Success(theState.minValue))
+      case _ if defaultMetricForNullValues.isDefined =>
+        DoubleMetric(Entity.Column, "MinLength", column, Success(defaultMetricForNullValues.get))
+      case _ =>
+        val exception = Analyzers.emptyStateException(this)
+        DoubleMetric(Entity.Column, "MinLength", column, Failure(exception))
     }
   }
 

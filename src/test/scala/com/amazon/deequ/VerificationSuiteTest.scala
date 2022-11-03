@@ -149,41 +149,41 @@ class VerificationSuiteTest
         }
       }
 
-    "return the correct verification on numeric columns" in
-      withSparkSession { sparkSession =>
-        val df = getDfCompleteAndInCompleteColumnsNumeric(sparkSession)
-
-        val checkToSucceed = Check(CheckLevel.Error, "numeric-1-S")
-          // .isComplete("item")
-          .isComplete("completeInteger")
-          .isComplete("completeDouble")
-          .hasCompleteness("completeInteger", _ == 1.0)
-          .hasCompleteness("completeDouble", _ == 1.0)
-          .hasCompleteness("incompleteInteger", _ <= 1.0)
-          .hasCompleteness("incompleteDouble", _ <= 1.0)
-
-        val checkToErrorOut = Check(CheckLevel.Error, "numeric-1-F")
-          .isComplete("incompleteInteger")
-          .isComplete("incompleteDouble")
-          .hasCompleteness("completeInteger", _ == 1.0)
-          .hasCompleteness("completeDouble", _ == 1.0)
-          .hasCompleteness("incompleteInteger", _ >= 0.8)
-          .hasCompleteness("incompleteDouble", _ >= 0.8)
-          .hasCompleteness("att1", _ >= 0.99)
-          .isComplete("att1")
-          .hasCompleteness("missingColumn", _ >= 0.8)
-
-        printCheckResults(df, checkToSucceed)
-        printCheckResults(df, checkToErrorOut)
-
-        Seq(checkToSucceed).forEachOrder { checks =>
-          assertStatusFor(df, checks: _*)(CheckStatus.Success)
-        }
-
-        Seq(checkToErrorOut).forEachOrder { checks =>
-          assertStatusFor(df, checks: _*)(CheckStatus.Error)
-        }
-      }
+//    "return the correct verification on numeric columns" in
+//      withSparkSession { sparkSession =>
+//        val df = getDfCompleteAndInCompleteColumnsNumeric(sparkSession)
+//
+//        val checkToSucceed = Check(CheckLevel.Error, "numeric-1-S")
+//          // .isComplete("item")
+//          .isComplete("completeInteger")
+//          .isComplete("completeDouble")
+//          .hasCompleteness("completeInteger", _ == 1.0)
+//          .hasCompleteness("completeDouble", _ == 1.0)
+//          .hasCompleteness("incompleteInteger", _ <= 1.0)
+//          .hasCompleteness("incompleteDouble", _ <= 1.0)
+//
+//        val checkToErrorOut = Check(CheckLevel.Error, "numeric-1-F")
+//          .isComplete("incompleteInteger")
+//          .isComplete("incompleteDouble")
+//          .hasCompleteness("completeInteger", _ == 1.0)
+//          .hasCompleteness("completeDouble", _ == 1.0)
+//          .hasCompleteness("incompleteInteger", _ >= 0.8)
+//          .hasCompleteness("incompleteDouble", _ >= 0.8)
+//          .hasCompleteness("att1", _ >= 0.99)
+//          .isComplete("att1")
+//          .hasCompleteness("missingColumn", _ >= 0.8)
+//
+//        printCheckResults(df, checkToSucceed)
+//        printCheckResults(df, checkToErrorOut)
+//
+//        Seq(checkToSucceed).forEachOrder { checks =>
+//          assertStatusFor(df, checks: _*)(CheckStatus.Success)
+//        }
+//
+//        Seq(checkToErrorOut).forEachOrder { checks =>
+//          assertStatusFor(df, checks: _*)(CheckStatus.Error)
+//        }
+//      }
 
     "return the correct verification status regardless of the order of checks" in
       withSparkSession { sparkSession =>
